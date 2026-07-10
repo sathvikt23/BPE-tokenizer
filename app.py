@@ -10,21 +10,32 @@ import os
 
 app = FastAPI(title="Multilingual BPE Tokenizer")
 
-# Serve static files from /static
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
-templates = Jinja2Templates(directory="templates")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Load tokenizer once
-tokenizer = Tokenizer.from_file(
-    "tokenizer_file/tokenizer.json"
+app = FastAPI(title="Multilingual BPE Tokenizer")
+
+app.mount(
+    "/static",
+    StaticFiles(directory=os.path.join(BASE_DIR, "static")),
+    name="static"
 )
 
-# Load statistics once
-with open("results/statistics.json", encoding="utf-8") as f:
+templates = Jinja2Templates(
+    directory=os.path.join(BASE_DIR, "templates")
+)
+
+
+tokenizer = Tokenizer.from_file(
+    os.path.join(BASE_DIR, "tokenizer_file", "tokenizer.json")
+)
+
+
+with open(
+    os.path.join(BASE_DIR, "results", "statistics.json"),
+    encoding="utf-8"
+) as f:
     statistics = json.load(f)
-
-
 class TokenizeRequest(BaseModel):
     text: str
 
@@ -71,11 +82,10 @@ async def tokenize(req: TokenizeRequest):
 async def get_statistics():
     return statistics
 
-
 @app.get("/download/tokenizer")
 async def download_tokenizer():
     return FileResponse(
-        "tokenizer_file/tokenizer.json",
+        os.path.join(BASE_DIR, "tokenizer_file", "tokenizer.json"),
         filename="tokenizer.json",
         media_type="application/json"
     )
