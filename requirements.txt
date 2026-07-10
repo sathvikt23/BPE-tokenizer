@@ -1,0 +1,7 @@
+fastapi>=0.100.0
+uvicorn>=0.22.0
+jinja2>=3.1.2
+pydantic>=2.0.0
+tokenizers>=0.13.3
+#requests
+#bs4

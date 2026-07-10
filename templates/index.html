@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Explore multilingual Byte Pair Encoding (BPE) tokenization in real-time. Analyze compression ratios, search vocabularies, and download custom tokenizers.">
+
+<title>Multilingual BPE Tokenizer Playground</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+
+:root {
+    --bg-main: #09090b;
+    --card-bg: #18181b;
+    --border-color: #27272a;
+    --primary: #ffffff;
+    --primary-hover: #f4f4f5;
+    --primary-glow: rgba(255, 255, 255, 0.1);
+    --accent: #a1a1aa;
+    --text-muted: #71717a;
+    --text-main: #fafafa;
+    --card-radius: 12px;
+    --transition: all 0.2s ease-in-out;
+}
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    padding: 40px 20px;
+    min-height: 100vh;
+}
+
+.container{
+    max-width:1400px;
+    margin:auto;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+h1{
+    font-size:38px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--text-main);
+    margin-bottom:12px;
+}
+
+.subtitle{
+    color: var(--text-muted);
+    font-size: 16px;
+    font-weight: 400;
+}
+
+
+.grid{
+    display:grid;
+    grid-template-columns:350px 1fr;
+    gap:30px;
+}
+
+.left{
+    display:flex;
+    flex-direction:column;
+    gap:25px;
+}
+
+.right{
+    display:flex;
+    flex-direction:column;
+    gap:25px;
+}
+
+.card{
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--card-radius);
+    padding: 24px;
+    transition: var(--transition);
+}
+
+.card:hover{
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.card h2{
+    font-size:18px;
+    font-weight: 600;
+    margin-bottom:20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.summary{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:16px;
+}
+
+.metric{
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    transition: var(--transition);
+}
+
+.metric:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.metric-title{
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.metric-value{
+    margin-top:8px;
+    font-size:24px;
+    font-weight:700;
+    color: var(--text-main);
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    overflow: hidden;
+}
+
+th{
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-main);
+    font-weight: 600;
+    padding:12px;
+    font-size: 13px;
+    text-align: left;
+    border-bottom: 2px solid var(--border-color);
+}
+
+td{
+    padding:12px;
+    border-bottom:1px solid var(--border-color);
+    font-size: 13px;
+    text-align: left;
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+textarea{
+    width:100%;
+    min-height:200px;
+    resize:vertical;
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 18px;
+    font-size: 15px;
+    line-height: 1.6;
+    outline:none;
+    transition: var(--transition);
+    font-family: inherit;
+}
+
+textarea:focus{
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.token-area{
+    background: rgba(0, 0, 0, 0.2);
+    border-radius:8px;
+    border: 1px solid var(--border-color);
+    min-height: 180px;
+    padding: 20px;
+    line-height: 2.2;
+    transition: var(--transition);
+}
+
+.token{
+    display:inline-block;
+    margin: 3px 5px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-family: 'Fira Code', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-main);
+    cursor:pointer;
+    transition: var(--transition);
+}
+
+.token:hover{
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    filter: brightness(1.2);
+}
+
+.c0{background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.25);}
+.c1{background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);}
+.c2{background: rgba(255, 255, 255, 0.20); border: 1px solid rgba(255, 255, 255, 0.35); color: #000000;}
+.c3{background: rgba(255, 255, 255, 0.09); border: 1px solid rgba(255, 255, 255, 0.18);}
+.c4{background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.20);}
+.c5{background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08);}
+.c6{background: rgba(255, 255, 255, 0.18); border: 1px solid rgba(255, 255, 255, 0.30); color: #000000;}
+.c7{background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.15);}
+
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:16px;
+}
+
+.stat-box{
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    border-radius:8px;
+    padding:16px;
+    text-align:center;
+    transition: var(--transition);
+}
+
+.stat-box:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.stat-title{
+    color: var(--text-muted);
+    font-size:11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stat-value{
+    font-size:24px;
+    margin-top:8px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.downloads{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.btn{
+    display:inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-decoration:none;
+    background: #ffffff;
+    color: #09090b;
+    padding:12px 20px;
+    border-radius:6px;
+    font-weight: 600;
+    font-size: 13px;
+    flex: 1;
+    min-width: 130px;
+    transition: var(--transition);
+    border: 1px solid #ffffff;
+}
+
+.btn:hover{
+    background: #e4e4e7;
+    border-color: #e4e4e7;
+    color: #09090b;
+}
+
+#tooltip{
+    position:fixed;
+    display:none;
+    background: #18181b;
+    border: 1px solid var(--border-color);
+    border-radius:8px;
+    padding:12px;
+    z-index:9999;
+    pointer-events:none;
+    font-size:12px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    color: var(--text-main);
+}
+
+.search{
+    width:100%;
+    padding:10px 14px;
+    border-radius:6px;
+    border: 1px solid var(--border-color);
+    background: rgba(0, 0, 0, 0.2);
+    color: white;
+    margin-bottom:15px;
+    font-size:13px;
+    transition: var(--transition);
+    outline: none;
+}
+
+.search:focus {
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+#vocab{
+    height:300px;
+    overflow-y:auto;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    border-radius:8px;
+    padding:8px;
+}
+
+/* Custom Scrollbar for Vocab List */
+#vocab::-webkit-scrollbar {
+    width: 6px;
+}
+#vocab::-webkit-scrollbar-track {
+    background: transparent;
+}
+#vocab::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+#vocab::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.vocab-item{
+    display:flex;
+    justify-content:space-between;
+    align-items: center;
+    padding:8px 12px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    font-family: 'Fira Code', monospace;
+    font-size: 13px;
+    transition: var(--transition);
+}
+
+.vocab-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.vocab-token {
+    color: #ffffff;
+    max-width: 70%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vocab-id {
+    color: var(--text-muted);
+}
+
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    gap: 8px;
+    padding: 40px 0;
+}
+
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+@media(max-width:1100px){
+    .grid{
+        grid-template-columns:1fr;
+    }
+    .stats-grid{
+        grid-template-columns:repeat(2,1fr);
+    }
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div id="tooltip"></div>
+
+<div class="container">
+
+<header>
+    <h1>Multilingual BPE Tokenizer</h1>
+    <div class="subtitle">
+        Interactive BPE Tokenizer Playground & vocabulary explorer
+    </div>
+</header>
+
+<div class="grid">
+
+<div class="left">
+
+<div class="card">
+
+<h2>Assignment Statistics</h2>
+
+<table>
+
+<tr>
+
+<th>Language</th>
+<th>Words</th>
+<th>Tokens</th>
+<th>Ratio</th>
+
+</tr>
+
+{% for lang,data in stats.items() %}
+
+{% if lang!="summary" %}
+
+<tr>
+
+<td>{{lang}}</td>
+<td>{{data.words}}</td>
+<td>{{data.tokens}}</td>
+<td>{{data.ratio}}</td>
+
+</tr>
+
+{% endif %}
+
+{% endfor %}
+
+</table>
+
+</div>
+
+<div class="card">
+
+<h2>Tokenizer Score</h2>
+
+<div class="summary">
+
+<div class="metric">
+
+<div class="metric-title">Largest Ratio</div>
+
+<div class="metric-value">
+
+{{stats.summary.largest_ratio}}
+
+</div>
+
+</div>
+
+<div class="metric">
+
+<div class="metric-title">Smallest Ratio</div>
+
+<div class="metric-value">
+
+{{stats.summary.smallest_ratio}}
+
+</div>
+
+</div>
+
+<div class="metric">
+
+<div class="metric-title">Self Score</div>
+
+<div class="metric-value">
+
+{{stats.summary.score}}
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="card">
+
+<h2>Download Artifacts</h2>
+
+<div class="downloads">
+
+<a class="btn" href="/download/tokenizer">
+
+Tokenizer JSON
+
+</a>
+
+<a class="btn" href="/download/vocabulary">
+
+Vocabulary
+
+</a>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="right">
+
+<div class="card">
+
+<h2>Tokenizer Playground</h2>
+
+<textarea id="text">India is a democratic republic with many languages including English, Hindi, Marathi and Telugu.</textarea>
+
+</div>
+
+<div class="card">
+
+<div class="stats-grid">
+
+<div class="stat-box">
+
+<div class="stat-title">Characters</div>
+
+<div class="stat-value" id="chars">0</div>
+
+</div>
+
+<div class="stat-box">
+
+<div class="stat-title">Words</div>
+
+<div class="stat-value" id="words">0</div>
+
+</div>
+
+<div class="stat-box">
+
+<div class="stat-title">Tokens</div>
+
+<div class="stat-value" id="tokens">0</div>
+
+</div>
+
+<div class="stat-box">
+
+<div class="stat-title">Ratio</div>
+
+<div class="stat-value" id="ratio">0</div>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="card">
+
+<h2>Tokens</h2>
+
+<div id="output" class="token-area">
+
+Start typing...
+
+</div>
+
+</div>
+
+<div class="card">
+
+<h2>Vocabulary Search</h2>
+
+<input
+id="search"
+class="search"
+placeholder="Search token...">
+
+<div id="vocab">
+
+Vocabulary will load...
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+<script src="/static/app.js"></script>
+
+</body>
+
+</html>

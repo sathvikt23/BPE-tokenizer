@@ -1,0 +1,28 @@
+{
+    "english": {
+        "words": 10336,
+        "tokens": 17445,
+        "ratio": 1.6878
+    },
+    "hindi": {
+        "words": 7863,
+        "tokens": 9121,
+        "ratio": 1.16
+    },
+    "marathi": {
+        "words": 4482,
+        "tokens": 6102,
+        "ratio": 1.3614
+    },
+    "telugu": {
+        "words": 2190,
+        "tokens": 2190,
+        "ratio": 1.0
+    },
+    "summary": {
+        "largest_ratio": 1.6878,
+        "smallest_ratio": 1.0,
+        "difference": 0.6878,
+        "score": 1453.93
+    }
+}
