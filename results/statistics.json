@@ -1,28 +1,30 @@
 {
     "english": {
-        "words": 10336,
-        "tokens": 17445,
-        "ratio": 1.6878
+        "tokens": 105414,
+        "faithful_units": 121935,
+        "fertility": 0.86451
     },
     "hindi": {
-        "words": 7863,
-        "tokens": 9121,
-        "ratio": 1.16
+        "tokens": 47066,
+        "faithful_units": 56263,
+        "fertility": 0.836536
     },
     "marathi": {
-        "words": 4482,
-        "tokens": 6102,
-        "ratio": 1.3614
+        "tokens": 22463,
+        "faithful_units": 18756,
+        "fertility": 1.197643
     },
     "telugu": {
-        "words": 2190,
-        "tokens": 2190,
-        "ratio": 1.0
+        "tokens": 22764,
+        "faithful_units": 23164,
+        "fertility": 0.982732
     },
     "summary": {
-        "largest_ratio": 1.6878,
-        "smallest_ratio": 1.0,
-        "difference": 0.6878,
-        "score": 1453.93
+        "max_fertility": 1.197643,
+        "min_fertility": 0.836536,
+        "spread": 0.361108,
+        "raw_score": 2769.26,
+        "hindi_penalty_factor": 1.0,
+        "hindi_adjusted_score": 2769.26
     }
 }

@@ -8,8 +8,6 @@ from tokenizers import Tokenizer
 import json
 import os
 
-app = FastAPI(title="Multilingual BPE Tokenizer")
-
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 

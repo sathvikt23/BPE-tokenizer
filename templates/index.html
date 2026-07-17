@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Explore multilingual Byte Pair Encoding (BPE) tokenization in real-time. Analyze compression ratios, search vocabularies, and download custom tokenizers.">
+<meta name="description" content="Multilingual BPE tokenizer ">
 
 <title>Multilingual BPE Tokenizer Playground</title>
 
@@ -418,7 +418,6 @@ textarea:focus{
 
 <header>
     <h1>BPE Tokenizer</h1>
-    
 </header>
 
 <div class="grid">
@@ -434,9 +433,9 @@ textarea:focus{
 <tr>
 
 <th>Language</th>
-<th>Words</th>
+<th>Faithful Units</th>
 <th>Tokens</th>
-<th>Ratio</th>
+<th>Fertility</th>
 
 </tr>
 
@@ -447,9 +446,9 @@ textarea:focus{
 <tr>
 
 <td>{{lang}}</td>
-<td>{{data.words}}</td>
+<td>{{data.faithful_units if data.faithful_units is defined else data.words}}</td>
 <td>{{data.tokens}}</td>
-<td>{{data.ratio}}</td>
+<td>{{data.fertility if data.fertility is defined else data.ratio}}</td>
 
 </tr>
 
@@ -469,11 +468,11 @@ textarea:focus{
 
 <div class="metric">
 
-<div class="metric-title">Largest Ratio</div>
+<div class="metric-title">Max Fertility</div>
 
 <div class="metric-value">
 
-{{stats.summary.largest_ratio}}
+{{stats.summary.max_fertility if stats.summary.max_fertility is defined else stats.summary.largest_ratio}}
 
 </div>
 
@@ -481,11 +480,11 @@ textarea:focus{
 
 <div class="metric">
 
-<div class="metric-title">Smallest Ratio</div>
+<div class="metric-title">Min Fertility</div>
 
 <div class="metric-value">
 
-{{stats.summary.smallest_ratio}}
+{{stats.summary.min_fertility if stats.summary.min_fertility is defined else stats.summary.smallest_ratio}}
 
 </div>
 
@@ -493,11 +492,47 @@ textarea:focus{
 
 <div class="metric">
 
-<div class="metric-title">Self Score</div>
+<div class="metric-title">Spread</div>
 
 <div class="metric-value">
 
-{{stats.summary.score}}
+{{stats.summary.spread if stats.summary.spread is defined else stats.summary.difference}}
+
+</div>
+
+</div>
+
+<div class="metric">
+
+<div class="metric-title">Raw Score</div>
+
+<div class="metric-value">
+
+{{stats.summary.raw_score if stats.summary.raw_score is defined else stats.summary.score}}
+
+</div>
+
+</div>
+
+<div class="metric">
+
+<div class="metric-title">Hindi Penalty</div>
+
+<div class="metric-value">
+
+{{stats.summary.hindi_penalty_factor if stats.summary.hindi_penalty_factor is defined else "1.0"}}
+
+</div>
+
+</div>
+
+<div class="metric">
+
+<div class="metric-title">Adjusted Score</div>
+
+<div class="metric-value">
+
+{{stats.summary.hindi_adjusted_score if stats.summary.hindi_adjusted_score is defined else stats.summary.score}}
 
 </div>
 
@@ -537,7 +572,7 @@ Vocabulary
 
 <h2>Tokenizer Playground</h2>
 
-<textarea id="text">India is a democratic republic with many languages including English, Hindi, Marathi and Telugu.</textarea>
+<textarea id="text">India's population is 1,428,627,663. See #cite_ref-1 and https://en.wikipedia.org/wiki/India for details about भारत।</textarea>
 
 </div>
 
