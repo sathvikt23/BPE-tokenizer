@@ -1,0 +1,2036 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description"
+    content="Foundation LLM Design Report – Corpus, Tokenizer, Scaling, Post-Training and Alignment">
+  <title>Foundation LLM Design Report</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Fira+Code:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    /* ── RESET & TOKENS ─────────────────────────────── */
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #03050a;
+      --surface: #0d111c;
+      --surface2: #131929;
+      --border: #1e2a40;
+      --border2: #253044;
+      --blue: #3b82f6;
+      --indigo: #6366f1;
+      --violet: #8b5cf6;
+      --cyan: #06b6d4;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --pink: #ec4899;
+      --text: #f1f5f9;
+      --muted: #64748b;
+      --soft: #94a3b8;
+      --radius: 14px;
+      --radius-sm: 8px;
+      --shadow: 0 20px 60px -10px rgba(0, 0, 0, 0.7);
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── SCROLLBAR ──────────────────────────────────── */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #1e3a5f;
+      border-radius: 3px;
+    }
+
+    /* ── AMBIENT BG ─────────────────────────────────── */
+    .ambient {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 60% 40% at 20% 10%, rgba(59, 130, 246, 0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 80% 80%, rgba(139, 92, 246, 0.05) 0%, transparent 60%);
+    }
+
+    /* ── NAV ────────────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      backdrop-filter: blur(20px);
+      background: rgba(3, 5, 10, 0.85);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      background: linear-gradient(135deg, var(--blue), var(--violet));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 4px;
+    }
+
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-links a.active {
+      color: var(--blue);
+    }
+
+    /* ── HERO ───────────────────────────────────────── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 100px 24px 60px;
+      position: relative;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: 100px;
+      padding: 6px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--blue);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 28px;
+    }
+
+    .hero-badge::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--blue);
+      animation: pulse-dot 2s ease infinite;
+    }
+
+    @keyframes pulse-dot {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+
+      50% {
+        opacity: 0.5;
+        transform: scale(0.7);
+      }
+    }
+
+    .hero h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(36px, 6vw, 72px);
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      margin-bottom: 24px;
+    }
+
+    .grad-blue {
+      background: linear-gradient(135deg, #60a5fa, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .grad-violet {
+      background: linear-gradient(135deg, #a78bfa, #ec4899);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .grad-cyan {
+      background: linear-gradient(135deg, #06b6d4, #10b981);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-desc {
+      max-width: 680px;
+      font-size: 17px;
+      color: var(--soft);
+      font-weight: 400;
+      margin-bottom: 48px;
+      line-height: 1.7;
+    }
+
+    .hero-pills {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 56px;
+    }
+
+    .pill {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 100px;
+      padding: 8px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--soft);
+      transition: all 0.2s;
+    }
+
+    .pill:hover {
+      border-color: var(--blue);
+      color: var(--text);
+    }
+
+    .hero-scroll {
+      position: absolute;
+      bottom: 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      animation: bounce 2s ease infinite;
+    }
+
+    @keyframes bounce {
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(6px);
+      }
+    }
+
+    .scroll-arrow {
+      font-size: 20px;
+    }
+
+    /* ── SECTION BASE ───────────────────────────────── */
+    section {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 80px 24px;
+    }
+
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 14px;
+      padding: 4px 12px;
+      border-radius: 4px;
+    }
+
+    .label-blue {
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--blue);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    .label-violet {
+      background: rgba(139, 92, 246, 0.1);
+      color: var(--violet);
+      border: 1px solid rgba(139, 92, 246, 0.2);
+    }
+
+    .label-cyan {
+      background: rgba(6, 182, 212, 0.1);
+      color: var(--cyan);
+      border: 1px solid rgba(6, 182, 212, 0.2);
+    }
+
+    .label-emerald {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .label-amber {
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--amber);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .label-rose {
+      background: rgba(244, 63, 94, 0.1);
+      color: var(--rose);
+      border: 1px solid rgba(244, 63, 94, 0.2);
+    }
+
+    .section-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: clamp(26px, 3.5vw, 40px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 14px;
+    }
+
+    .section-desc {
+      color: var(--soft);
+      font-size: 16px;
+      max-width: 660px;
+      margin-bottom: 48px;
+    }
+
+    /* ── DIVIDER ────────────────────────────────────── */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border2), transparent);
+      margin: 0 24px;
+    }
+
+    /* ── CARDS ──────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 28px;
+      transition: border-color 0.25s, transform 0.25s, box-shadow 0.25s;
+    }
+
+    .card:hover {
+      border-color: var(--border2);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    /* ── POOL GRID ──────────────────────────────────── */
+    .pools-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 16px;
+    }
+
+    .pool-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+      transition: all 0.25s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pool-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+    }
+
+    .pool-d1::before {
+      background: var(--blue);
+    }
+
+    .pool-d2::before {
+      background: var(--cyan);
+    }
+
+    .pool-d3::before {
+      background: var(--emerald);
+    }
+
+    .pool-d4::before {
+      background: var(--violet);
+    }
+
+    .pool-aon::before {
+      background: var(--amber);
+    }
+
+    .pool-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--border2);
+      box-shadow: 0 12px 40px -8px rgba(0, 0, 0, 0.5);
+    }
+
+    .pool-tag {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .pool-name {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .pool-desc {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .pool-sources {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .source-chip {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 100px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border2);
+      color: var(--soft);
+    }
+
+    /* ── MIXTURE CHART ──────────────────────────────── */
+    .mixture-wrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      align-items: center;
+    }
+
+    .donut-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .donut-center {
+      position: absolute;
+      text-align: center;
+    }
+
+    .donut-center .big {
+      font-size: 26px;
+      font-weight: 800;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .donut-center .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .mix-legend {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .mix-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mix-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .mix-bar-wrap {
+      flex: 1;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .mix-bar {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 1s ease;
+    }
+
+    .mix-label {
+      width: 130px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .mix-pct {
+      font-size: 13px;
+      font-weight: 700;
+      font-family: 'Fira Code', monospace;
+      width: 36px;
+      text-align: right;
+    }
+
+    /* ── PIPELINE ───────────────────────────────────── */
+    .pipeline {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      max-width: 560px;
+      margin: 0 auto;
+    }
+
+    .pipe-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 18px 0;
+      position: relative;
+    }
+
+    .pipe-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .pipe-num {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+      font-family: 'Fira Code', monospace;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      flex-shrink: 0;
+      z-index: 1;
+      transition: all 0.25s;
+    }
+
+    .pipe-step:hover .pipe-num {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #fff;
+    }
+
+    .pipe-line {
+      width: 1px;
+      flex: 1;
+      background: var(--border);
+      margin: 4px 0;
+      min-height: 24px;
+    }
+
+    .pipe-step:last-child .pipe-line {
+      display: none;
+    }
+
+    .pipe-content {
+      padding-top: 6px;
+      padding-bottom: 8px;
+    }
+
+    .pipe-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .pipe-sub {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* ── CURRICULUM TABLE ───────────────────────────── */
+    .stage-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .stage-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.25s;
+    }
+
+    .stage-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--border2);
+      box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.5);
+    }
+
+    .stage-num {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+
+    .stage-params {
+      font-size: 28px;
+      font-weight: 800;
+      font-family: 'Space Grotesk', sans-serif;
+      margin-bottom: 6px;
+    }
+
+    .stage-obj {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .stage-bar {
+      height: 3px;
+      border-radius: 2px;
+      margin-top: 16px;
+    }
+
+    /* ── SCALING REASON BOX ─────────────────────────── */
+    .reason-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+
+    .reason-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 24px;
+      transition: all 0.25s;
+    }
+
+    .reason-card:hover {
+      border-color: var(--border2);
+    }
+
+    .reason-num {
+      font-size: 32px;
+      font-weight: 900;
+      font-family: 'Space Grotesk', sans-serif;
+      opacity: 0.12;
+      line-height: 1;
+      margin-bottom: -10px;
+    }
+
+    .reason-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .reason-body {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    /* ── FERTILITY COMPARISON ───────────────────────── */
+    .fertility-table-wrap {
+      overflow-x: auto;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead tr {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    th {
+      padding: 14px 18px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    td {
+      padding: 14px 18px;
+      font-size: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .td-code {
+      font-family: 'Fira Code', monospace;
+    }
+
+    /* ── INLINE BAR ─────────────────────────────────── */
+    .inline-bar-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .inline-bar {
+      height: 8px;
+      border-radius: 4px;
+    }
+
+    /* ── TOKENIZER CARDS ────────────────────────────── */
+    .tok-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .tok-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 24px;
+      transition: all 0.25s;
+    }
+
+    .tok-card:hover {
+      border-color: var(--border2);
+      transform: translateY(-3px);
+    }
+
+    .tok-name {
+      font-size: 16px;
+      font-weight: 800;
+      margin-bottom: 14px;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .star-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .star-label {
+      font-size: 12px;
+      color: var(--muted);
+      width: 60px;
+      flex-shrink: 0;
+    }
+
+    .stars {
+      display: flex;
+      gap: 3px;
+    }
+
+    .star {
+      font-size: 11px;
+    }
+
+    .star.on {
+      color: var(--amber);
+    }
+
+    .star.off {
+      color: rgba(255, 255, 255, 0.1);
+    }
+
+    .tok-reason {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 14px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      line-height: 1.55;
+    }
+
+    /* ── POST-TRAINING ──────────────────────────────── */
+    .pt-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .pt-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+      transition: all 0.25s;
+    }
+
+    .pt-card:hover {
+      border-color: var(--border2);
+      transform: translateY(-2px);
+    }
+
+    .pt-icon {
+      font-size: 22px;
+      margin-bottom: 10px;
+    }
+
+    .pt-title {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .pt-body {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .pt-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 12px;
+    }
+
+    .pt-tag {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: 'Fira Code', monospace;
+    }
+
+    /* ── ALIGNMENT ──────────────────────────────────── */
+    .align-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      max-width: 460px;
+      margin: 0 auto;
+    }
+
+    .af-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+    }
+
+    .af-box {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 18px 20px;
+      margin: 6px;
+      transition: all 0.25s;
+    }
+
+    .af-box:hover {
+      border-color: var(--border2);
+      background: var(--surface);
+    }
+
+    .af-box h4 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .af-box p {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .af-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 20px;
+      padding: 0 4px;
+    }
+
+    .af-connector {
+      width: 1px;
+      background: linear-gradient(to bottom, var(--border), transparent);
+      margin: 0 auto;
+      height: 20px;
+    }
+
+    /* ── BENCHMARK ──────────────────────────────────── */
+    .bench-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .bench-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 22px;
+      transition: all 0.25s;
+    }
+
+    .bench-card:hover {
+      border-color: var(--border2);
+    }
+
+    .bench-stage {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+
+    .bench-what {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+
+    .bench-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .bench-chip {
+      font-size: 11px;
+      font-family: 'Fira Code', monospace;
+      padding: 3px 9px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border2);
+      color: var(--soft);
+    }
+
+    /* ── ANIMATIONS ─────────────────────────────────── */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── FOOTER ─────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 40px 24px;
+      color: var(--muted);
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── RESPONSIVE ─────────────────────────────────── */
+    @media (max-width: 900px) {
+      .mixture-wrap {
+        grid-template-columns: 1fr;
+      }
+
+      .stage-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .tok-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .bench-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .reason-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .nav-links {
+        display: none;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .stage-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="ambient"></div>
+
+  <!-- NAV -->
+  <!-- <nav>
+  <div class="nav-logo">🧠 LLM Design Report</div>
+  <div class="nav-links">
+    <a href="#corpus">Corpus</a>
+    <a href="#scaling">Scaling</a>
+    <a href="#tokenizer">Tokenizer</a>
+    <a href="#posttraining">Post-Training</a>
+    <a href="#alignment">Alignment</a>
+    <a href="#benchmarks">Benchmarks</a>
+  </div>
+</nav> -->
+
+  <!-- HERO -->
+  <!-- <div class="hero">
+  <div class="hero-badge">Student Design Report · Foundation LLM</div>
+  <h1>
+    Building a<br>
+    <span class="grad-blue">Multilingual</span><br>
+    <span class="grad-violet">Foundation Model</span>
+  </h1>
+  <p class="hero-desc">
+    A complete end-to-end design blueprint — from raw data collection and corpus strategy,
+    through tokenizer engineering, scaling laws, post-training, and alignment —
+    for a <strong>40B parameter</strong> multilingual language model.
+  </p>
+  <div class="hero-pills">
+    <div class="pill">📦 5 Data Pools</div>
+    <div class="pill">🔢 40B Parameters</div>
+    <div class="pill">🌐 Multilingual</div>
+    <div class="pill">🤖 BPE Tokenizer</div>
+    <div class="pill">⚖️ Chinchilla Scaling</div>
+    <div class="pill">🎯 RLHF Aligned</div>
+  </div>
+  <div class="hero-scroll">
+    <span>Scroll to explore</span>
+    <span class="scroll-arrow">↓</span>
+  </div>
+</div> -->
+
+  <div class="divider"></div>
+  <section id="corpus">
+    <h1 class="section-title">
+      Training a language model -s3
+    </h1>
+  </section>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!--  SECTION 1 · CORPUS DESIGN                    -->
+  <!-- ══════════════════════════════════════════════ -->
+  <section id="corpus">
+    <div class="fade-in">
+      <div class="section-label label-blue">01 · Corpus Design</div>
+      <h2 class="section-title">What Data Does the Model Train On?</h2>
+      <p class="section-desc">
+        The corpus is organized by <strong>knowledge domain</strong> — not by language.
+        This ensures the model learns broad capabilities while keeping multilingual and regional knowledge naturally
+        integrated.
+      </p>
+    </div>
+
+    <!-- Data Pools -->
+    <div class="pools-grid fade-in" style="margin-bottom:48px;">
+      <div class="pool-card pool-d1">
+        <div class="pool-tag" style="color:var(--blue);">D1</div>
+        <div class="pool-name">Web Foundation</div>
+        <div class="pool-desc">General language understanding and world knowledge. The backbone of the corpus.</div>
+        <div class="pool-sources">
+          <span class="source-chip">Common Crawl</span>
+          <span class="source-chip">Wikipedia</span>
+          <span class="source-chip">Books</span>
+          <span class="source-chip">News</span>
+        </div>
+      </div>
+      <div class="pool-card pool-d2">
+        <div class="pool-tag" style="color:var(--cyan);">D2</div>
+        <div class="pool-name">Web Diverse</div>
+        <div class="pool-desc">Long-tail multilingual and domain-diverse knowledge from the open web.</div>
+        <div class="pool-sources">
+          <span class="source-chip">Gov portals</span>
+          <span class="source-chip">Edu sites</span>
+          <span class="source-chip">Forums</span>
+          <span class="source-chip">Regional</span>
+        </div>
+      </div>
+      <div class="pool-card pool-d3">
+        <div class="pool-tag" style="color:var(--emerald);">D3</div>
+        <div class="pool-name">Code</div>
+        <div class="pool-desc">Programming and software engineering across languages and frameworks.</div>
+        <div class="pool-sources">
+          <span class="source-chip">GitHub</span>
+          <span class="source-chip">Stack Overflow</span>
+          <span class="source-chip">Docs</span>
+          <span class="source-chip">Tutorials</span>
+        </div>
+      </div>
+      <div class="pool-card pool-d4">
+        <div class="pool-tag" style="color:var(--violet);">D4</div>
+        <div class="pool-name">STEM</div>
+        <div class="pool-desc">Scientific, mathematical and technical reasoning from research and academia.</div>
+        <div class="pool-sources">
+          <span class="source-chip">arXiv</span>
+          <span class="source-chip">PubMed</span>
+          <span class="source-chip">Textbooks</span>
+          <span class="source-chip">Lectures</span>
+        </div>
+      </div>
+      <div class="pool-card pool-aon">
+        <div class="pool-tag" style="color:var(--amber);">Always-ON</div>
+        <div class="pool-name">High-Quality Reference</div>
+        <div class="pool-desc">Curated multilingual conversations and instructional datasets. Always present in every
+          batch.</div>
+        <div class="pool-sources">
+          <span class="source-chip">Instruction sets</span>
+          <span class="source-chip">Multilingual QA</span>
+          <span class="source-chip">Reference docs</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Training Mixture Donut -->
+    <div class="card fade-in" style="margin-bottom:48px;">
+      <div class="card-title">🎯 Final Training Mixture</div>
+      <div class="mixture-wrap">
+        <div class="donut-wrap">
+          <svg width="220" height="220" viewBox="0 0 220 220">
+            <circle cx="110" cy="110" r="85" fill="none" stroke="#1e2a40" stroke-width="28" />
+            <!-- D4 STEM 39% = 245.1 / 534.07 -->
+            <circle cx="110" cy="110" r="85" fill="none" stroke="#8b5cf6" stroke-width="28"
+              stroke-dasharray="207.3 527.8" stroke-dashoffset="0" transform="rotate(-90 110 110)" />
+            <!-- D3 Code 35% = 185.9 -->
+            <circle cx="110" cy="110" r="85" fill="none" stroke="#10b981" stroke-width="28"
+              stroke-dasharray="185.9 527.8" stroke-dashoffset="-207.3" transform="rotate(-90 110 110)" />
+            <!-- D1 Web 12% = 63.8 -->
+            <circle cx="110" cy="110" r="85" fill="none" stroke="#3b82f6" stroke-width="28"
+              stroke-dasharray="63.8 527.8" stroke-dashoffset="-393.2" transform="rotate(-90 110 110)" />
+            <!-- AON 8% = 42.5 -->
+            <circle cx="110" cy="110" r="85" fill="none" stroke="#f59e0b" stroke-width="28"
+              stroke-dasharray="42.5 527.8" stroke-dashoffset="-457" transform="rotate(-90 110 110)" />
+            <!-- D2 Diverse 6% = 31.9 -->
+            <circle cx="110" cy="110" r="85" fill="none" stroke="#06b6d4" stroke-width="28"
+              stroke-dasharray="31.9 527.8" stroke-dashoffset="-499.5" transform="rotate(-90 110 110)" />
+          </svg>
+          <div class="donut-center">
+            <div class="big">100<span style="font-size:14px;color:var(--muted);">%</span></div>
+            <div class="small">Training Mix</div>
+          </div>
+        </div>
+        <div class="mix-legend">
+          <div class="mix-row">
+            <div class="mix-dot" style="background:var(--violet)"></div>
+            <div class="mix-label">D4 – STEM</div>
+            <div class="mix-bar-wrap">
+              <div class="mix-bar" style="width:39%;background:var(--violet)"></div>
+            </div>
+            <div class="mix-pct" style="color:var(--violet)">39%</div>
+          </div>
+          <div class="mix-row">
+            <div class="mix-dot" style="background:var(--emerald)"></div>
+            <div class="mix-label">D3 – Code</div>
+            <div class="mix-bar-wrap">
+              <div class="mix-bar" style="width:35%;background:var(--emerald)"></div>
+            </div>
+            <div class="mix-pct" style="color:var(--emerald)">35%</div>
+          </div>
+          <div class="mix-row">
+            <div class="mix-dot" style="background:var(--blue)"></div>
+            <div class="mix-label">D1 – Web Foundation</div>
+            <div class="mix-bar-wrap">
+              <div class="mix-bar" style="width:12%;background:var(--blue)"></div>
+            </div>
+            <div class="mix-pct" style="color:var(--blue)">12%</div>
+          </div>
+          <div class="mix-row">
+            <div class="mix-dot" style="background:var(--amber)"></div>
+            <div class="mix-label">Always-ON</div>
+            <div class="mix-bar-wrap">
+              <div class="mix-bar" style="width:8%;background:var(--amber)"></div>
+            </div>
+            <div class="mix-pct" style="color:var(--amber)">8%</div>
+          </div>
+          <div class="mix-row">
+            <div class="mix-dot" style="background:var(--cyan)"></div>
+            <div class="mix-label">D2 – Web Diverse</div>
+            <div class="mix-bar-wrap">
+              <div class="mix-bar" style="width:6%;background:var(--cyan)"></div>
+            </div>
+            <div class="mix-pct" style="color:var(--cyan)">6%</div>
+          </div>
+          <p
+            style="font-size:12px;color:var(--muted);margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+            💡 Heavy Code (35%) + STEM (39%) weighting reflects the goal of building a strong reasoning and programming
+            model.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Cleaning Pipeline -->
+    <div class="card fade-in" style="margin-bottom:48px;">
+      <div class="card-title">🧹 Data Cleaning Pipeline</div>
+      <p style="font-size:14px;color:var(--muted);margin-bottom:28px;">Every document passes through 10 rigorous
+        cleaning stages before it enters the training pool.</p>
+      <div class="pipeline">
+        <div class="pipe-step">
+          <div class="pipe-left">
+            <div class="pipe-num">1</div>
+            <div class="pipe-line"></div>
+          </div>
+          <div class="pipe-content">
+            <div class="pipe-title">Language Identification</div>
+            <div class="pipe-sub">Detect and tag the language of each document</div>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-left">
+            <div class="pipe-num">2</div>
+            <div class="pipe-line"></div>
+          </div>
+          <div class="pipe-content">
+            <div class="pipe-title">Exact &amp; Near Deduplication</div>
+            <div class="pipe-sub">Remove duplicate and near-identical documents</div>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-left">
+            <div class="pipe-num">3</div>
+            <div class="pipe-line"></div>
+          </div>
+          <div class="pipe-content">
+            <div class="pipe-title">Text Extraction &amp; Normalization</div>
+            <div class="pipe-sub">Strip HTML, normalize Unicode and whitespace</div>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-left">
+            <div class="pipe-num">4</div>
+            <div class="pipe-line"></div>
+          </div>
+          <div class="pipe-content">
+            <div class="pipe-title">Heuristic Quality Filtering</div>
+            <div class="pipe-sub">Remove spam, SEO junk, and low-signal text using rule-based filters</div>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-left">
+            <div class="pipe-num">5</div>
+            <div class="pipe-line"></div>
+          </div>
+          <div class="pipe-content">
+            <div class="pipe-title">ML-Based Quality Classification</div>
+            <div class="pipe-sub">Classify documents by quality using trained classifiers</div>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-left">
+            <div class="pipe-num">6</div>
+            <div class="pipe-line"></div>
+          </div>
+          <div class="pipe-content">
+            <div class="pipe-title">Custom Task Filtering</div>
+            <div class="pipe-sub">Apply domain-specific filters (e.g., valid code, valid math)</div>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-left">
+            <div class="pipe-num">7</div>
+            <div class="pipe-line"></div>
+          </div>
+          <div class="pipe-content">
+            <div class="pipe-title">PII Detection &amp; Anonymization</div>
+            <div class="pipe-sub">Identify and redact personally identifiable information</div>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-left">
+            <div class="pipe-num">8</div>
+            <div class="pipe-line"></div>
+          </div>
+          <div class="pipe-content">
+            <div class="pipe-title">Domain Classification &amp; Clustering</div>
+            <div class="pipe-sub">Assign each document to its data pool (D1–D4, AON)</div>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-left">
+            <div class="pipe-num">9</div>
+            <div class="pipe-line"></div>
+          </div>
+          <div class="pipe-content">
+            <div class="pipe-title">Human Quality Evaluation</div>
+            <div class="pipe-sub">Spot-check a sample for final quality assurance</div>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <div class="pipe-left">
+            <div class="pipe-num" style="background:var(--emerald);border-color:var(--emerald);">✓</div>
+          </div>
+          <div class="pipe-content">
+            <div class="pipe-title" style="color:var(--emerald)">Final Clean Corpus</div>
+            <div class="pipe-sub">Ready for tokenizer training and pre-training</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Why domain-based -->
+    <div class="fade-in">
+      <h3 style="font-size:20px;font-weight:700;margin-bottom:20px;">Why Organize by Domain, Not Language?</h3>
+      <div class="reason-grid">
+        <div class="reason-card">
+          <div class="reason-num">1</div>
+          <div class="reason-title">Domain expertise over language separation</div>
+          <div class="reason-body">Programming, math, and science depend on <em>high-quality domain content</em> more
+            than the language it's written in. Separating by language would starve domains of cross-lingual signal.
+          </div>
+        </div>
+        <div class="reason-card">
+          <div class="reason-num">2</div>
+          <div class="reason-title">Global + Regional knowledge coexists</div>
+          <div class="reason-body">Instead of isolated language buckets, regional knowledge (news, govt, education)
+            appears naturally alongside global knowledge in every domain pool.</div>
+        </div>
+        <div class="reason-card">
+          <div class="reason-num">3</div>
+          <div class="reason-title">Better cross-lingual learning</div>
+          <div class="reason-body">Real documents mix English + Hindi, English + Telugu. Training on naturally
+            multilingual documents teaches semantic relationships across languages without dedicated alignment data.
+          </div>
+        </div>
+        <div class="reason-card">
+          <div class="reason-num">4</div>
+          <div class="reason-title">Balanced knowledge for all languages</div>
+          <div class="reason-body">Every language gets exposure to Science, Government, and Education instead of being
+            pigeonholed. This avoids <em>English → Science, Language X → Culture</em> asymmetry.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!--  SECTION 2 · SCALING STRATEGY                 -->
+  <!-- ══════════════════════════════════════════════ -->
+  <section id="scaling">
+    <div class="fade-in">
+      <div class="section-label label-violet">02 · Scaling Strategy</div>
+      <h2 class="section-title">Chinchilla-Inspired Progressive Scaling</h2>
+      <p class="section-desc">
+        Training efficiency requires balancing <strong>model parameters</strong>, <strong>training tokens</strong>, and
+        <strong>compute budget</strong>.
+        We don't just maximize parameter count — we co-optimize all three.
+      </p>
+    </div>
+
+    <div class="card fade-in" style="margin-bottom:40px;">
+      <div class="card-title">📊 Chinchilla Insight: More Data &gt; More Parameters</div>
+      <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border);">
+        <table>
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Parameters</th>
+              <th>Training Tokens</th>
+              <th>Winner?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:700">GPT-3</td>
+              <td class="td-code">175B</td>
+              <td class="td-code">300B</td>
+              <td><span style="color:var(--muted);font-size:12px;">Under-trained on data</span></td>
+            </tr>
+            <tr>
+              <td style="font-weight:700;color:var(--emerald)">Chinchilla</td>
+              <td class="td-code">70B</td>
+              <td class="td-code" style="color:var(--emerald)">1.4T</td>
+              <td><span style="color:var(--emerald);font-size:13px;font-weight:700;">✓ Better downstream perf</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin-top:16px;">
+        💡 Chinchilla has <em>fewer</em> parameters but <em>5× more</em> training tokens. This is the principle behind
+        our design.
+      </p>
+    </div>
+
+    <div class="fade-in">
+      <h3 style="font-size:18px;font-weight:700;margin-bottom:20px;">Progressive Scaling Stages</h3>
+      <div class="stage-grid" style="margin-bottom:48px;">
+        <div class="stage-card">
+          <div class="stage-num" style="color:var(--blue)">Stage 1</div>
+          <div class="stage-params">1B</div>
+          <div class="stage-obj">Validate tokenizer, optimizer, and data quality before investing more compute</div>
+          <div class="stage-bar" style="background:var(--blue);width:25%"></div>
+        </div>
+        <div class="stage-card">
+          <div class="stage-num" style="color:var(--cyan)">Stage 2</div>
+          <div class="stage-params">3B</div>
+          <div class="stage-obj">Evaluate multilingual learning and corpus mixture quality</div>
+          <div class="stage-bar" style="background:var(--cyan);width:50%"></div>
+        </div>
+        <div class="stage-card">
+          <div class="stage-num" style="color:var(--violet)">Stage 3</div>
+          <div class="stage-params">8B</div>
+          <div class="stage-obj">Verify scaling behaviour — does reasoning and coding emerge?</div>
+          <div class="stage-bar" style="background:var(--violet);width:75%"></div>
+        </div>
+        <div class="stage-card" style="border-color:var(--blue);">
+          <div class="stage-num" style="color:var(--rose)">Stage 4</div>
+          <div class="stage-params" style="color:var(--text)">40B</div>
+          <div class="stage-obj">Full-scale production training. Expert-level reasoning, coding, multilingual, and
+            agentic capabilities</div>
+          <div class="stage-bar" style="background:linear-gradient(90deg,var(--blue),var(--violet));width:100%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card fade-in">
+      <div class="card-title">🎓 Progressive Curriculum — What Each Model Learns First</div>
+      <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border);">
+        <table>
+          <thead>
+            <tr>
+              <th>Model Size</th>
+              <th>Primary Objective</th>
+              <th>Curriculum Focus</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="td-code" style="color:var(--blue)">1B</td>
+              <td>Language, syntax, grammar, basic world knowledge</td>
+              <td>Primarily Web Foundation + Always-ON</td>
+            </tr>
+            <tr>
+              <td class="td-code" style="color:var(--cyan)">3B</td>
+              <td>Multilingual understanding + factual knowledge</td>
+              <td>Increase Web Diverse + introduce Code &amp; STEM</td>
+            </tr>
+            <tr>
+              <td class="td-code" style="color:var(--violet)">8B</td>
+              <td>Programming, reasoning, mathematical capabilities</td>
+              <td>Higher Code + STEM emphasis</td>
+            </tr>
+            <tr>
+              <td class="td-code" style="color:var(--rose)">40B</td>
+              <td>Expert-level reasoning, coding, agentic tasks</td>
+              <td>Full mixture + curriculum-based data selection</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin-top:14px;">
+        📐 The principle: smaller models need broad linguistic competence first; larger models have the capacity to
+        absorb specialized technical knowledge.
+      </p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!--  SECTION 3 · TOKENIZER                        -->
+  <!-- ══════════════════════════════════════════════ -->
+  <section id="tokenizer">
+    <div class="fade-in">
+      <div class="section-label label-cyan">03 · Tokenizer Design</div>
+      <h2 class="section-title">The Fertility Problem in Multilingual Models</h2>
+      <p class="section-desc">
+        Transformer models process <strong>tokens</strong>, not words. The tokenizer determines how efficiently the
+        training budget is used.
+        For multilingual models, poorly designed tokenizers impose a heavy <em>fertility tax</em> on Indic languages.
+      </p>
+    </div>
+
+    <!-- Fertility comparison -->
+    <div class="card fade-in" style="margin-bottom:32px;">
+      <div class="card-title">⚠️ The Fertility Tax — Why English Tokenizers Fail for Indic Languages</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:20px;">
+        Using a tokenizer like GPT-3's <code
+          style="font-family:'Fira Code';background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px;">cl100k</code>
+        on the same sentence across languages:
+      </p>
+      <div class="fertility-table-wrap" style="margin-bottom:24px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Language</th>
+              <th>Tokens Used</th>
+              <th>Relative Cost</th>
+              <th>Visual</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:700">English</td>
+              <td class="td-code">14</td>
+              <td style="color:var(--emerald);font-weight:700">1×</td>
+              <td>
+                <div class="inline-bar-wrap">
+                  <div class="inline-bar" style="width:100px;background:var(--emerald)"></div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="font-weight:700">Hindi</td>
+              <td class="td-code">80</td>
+              <td style="color:var(--amber);font-weight:700">5.7×</td>
+              <td>
+                <div class="inline-bar-wrap">
+                  <div class="inline-bar" style="width:180px;background:var(--amber)"></div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="font-weight:700">Tamil</td>
+              <td class="td-code">97</td>
+              <td style="color:var(--rose);font-weight:700">6.9×</td>
+              <td>
+                <div class="inline-bar-wrap">
+                  <div class="inline-bar" style="width:200px;background:var(--rose)"></div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="font-weight:700">Telugu</td>
+              <td class="td-code">150</td>
+              <td style="color:var(--rose);font-weight:700">10.7×</td>
+              <td>
+                <div class="inline-bar-wrap">
+                  <div class="inline-bar" style="width:240px;background:var(--rose)"></div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="background:rgba(244,63,94,0.08);border:1px solid rgba(244,63,94,0.2);border-radius:8px;padding:16px;">
+        <strong style="color:var(--rose)">💸 Consequence:</strong>
+        <span style="font-size:13px;color:var(--soft);"> Under a 1 trillion token budget, the model observes ~833B
+          English words but only ~556B Telugu words — a <strong>33% information deficit</strong> for Telugu, despite
+          identical compute.</span>
+      </div>
+    </div>
+
+    <!-- Candidate Tokenizers -->
+    <div class="fade-in">
+      <h3 style="font-size:18px;font-weight:700;margin-bottom:20px;">Candidate Tokenizer Families</h3>
+      <div class="tok-grid">
+        <div class="tok-card">
+          <div class="tok-name">BPE</div>
+          <div class="star-row"><span class="star-label">English</span>
+            <div class="stars"><span class="star on">★</span><span class="star on">★</span><span
+                class="star on">★</span><span class="star on">★</span><span class="star on">★</span></div>
+          </div>
+          <div class="star-row"><span class="star-label">Indic</span>
+            <div class="stars"><span class="star on">★</span><span class="star on">★</span><span
+                class="star off">★</span><span class="star off">★</span><span class="star off">★</span></div>
+          </div>
+          <div class="star-row"><span class="star-label">Code</span>
+            <div class="stars"><span class="star on">★</span><span class="star on">★</span><span
+                class="star on">★</span><span class="star on">★</span><span class="star on">★</span></div>
+          </div>
+          <div class="star-row"><span class="star-label">Agentic</span>
+            <div class="stars"><span class="star on">★</span><span class="star on">★</span><span
+                class="star on">★</span><span class="star off">★</span><span class="star off">★</span></div>
+          </div>
+          <div class="tok-reason">Excellent compression for English and code, but tends to fragment morphologically rich
+            Indic words into many short subwords.</div>
+        </div>
+        <div class="tok-card" style="border-color:rgba(16,185,129,0.3);">
+          <div class="tok-name" style="color:var(--emerald)">SentencePiece Unigram</div>
+          <div class="star-row"><span class="star-label">English</span>
+            <div class="stars"><span class="star on">★</span><span class="star on">★</span><span
+                class="star on">★</span><span class="star on">★</span><span class="star off">★</span></div>
+          </div>
+          <div class="star-row"><span class="star-label">Indic</span>
+            <div class="stars"><span class="star on">★</span><span class="star on">★</span><span
+                class="star on">★</span><span class="star on">★</span><span class="star on">★</span></div>
+          </div>
+          <div class="star-row"><span class="star-label">Code</span>
+            <div class="stars"><span class="star on">★</span><span class="star on">★</span><span
+                class="star on">★</span><span class="star on">★</span><span class="star off">★</span></div>
+          </div>
+          <div class="star-row"><span class="star-label">Agentic</span>
+            <div class="stars"><span class="star on">★</span><span class="star on">★</span><span
+                class="star on">★</span><span class="star on">★</span><span class="star off">★</span></div>
+          </div>
+          <div class="tok-reason">Produces statistically optimal subword units. Best overall fertility for Indic
+            languages. Generally the strongest multilingual performer.</div>
+        </div>
+        <div class="tok-card">
+          <div class="tok-name">Byte-Level BPE</div>
+          <div class="star-row"><span class="star-label">English</span>
+            <div class="stars"><span class="star on">★</span><span class="star on">★</span><span
+                class="star on">★</span><span class="star on">★</span><span class="star off">★</span></div>
+          </div>
+          <div class="star-row"><span class="star-label">Indic</span>
+            <div class="stars"><span class="star on">★</span><span class="star on">★</span><span
+                class="star on">★</span><span class="star on">★</span><span class="star off">★</span></div>
+          </div>
+          <div class="star-row"><span class="star-label">Code</span>
+            <div class="stars"><span class="star on">★</span><span class="star on">★</span><span
+                class="star on">★</span><span class="star on">★</span><span class="star on">★</span></div>
+          </div>
+          <div class="star-row"><span class="star-label">Agentic</span>
+            <div class="stars"><span class="star on">★</span><span class="star on">★</span><span
+                class="star on">★</span><span class="star on">★</span><span class="star on">★</span></div>
+          </div>
+          <div class="tok-reason">No unknown tokens. Exceptional on source code, JSON, XML, HTML, Markdown. Ideal for
+            agentic tasks requiring structured output.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!--  SECTION 4 · POST-TRAINING                    -->
+  <!-- ══════════════════════════════════════════════ -->
+  <section id="posttraining">
+    <div class="fade-in">
+      <div class="section-label label-emerald">04 · Post-Training</div>
+      <h2 class="section-title">Teaching the Model <em>How</em> to Answer</h2>
+      <p class="section-desc">
+        Pre-training teaches <em>what the world knows</em>. Post-training teaches <em>how to communicate it</em>.
+        Quality and diversity matter more than scale here.
+      </p>
+    </div>
+
+    <div class="pt-grid fade-in">
+      <div class="pt-card">
+        <div class="pt-icon">📋</div>
+        <div class="pt-title">Instruction Following</div>
+        <div class="pt-body">Teaches the model to correctly interpret and execute user instructions with high fidelity.
+        </div>
+        <div class="pt-tags">
+          <span class="pt-tag"
+            style="background:rgba(59,130,246,0.1);color:var(--blue);border:1px solid rgba(59,130,246,0.2)">FLAN</span>
+          <span class="pt-tag"
+            style="background:rgba(59,130,246,0.1);color:var(--blue);border:1px solid rgba(59,130,246,0.2)">Dolly</span>
+          <span class="pt-tag"
+            style="background:rgba(59,130,246,0.1);color:var(--blue);border:1px solid rgba(59,130,246,0.2)">T0</span>
+        </div>
+      </div>
+      <div class="pt-card">
+        <div class="pt-icon">💬</div>
+        <div class="pt-title">Multi-turn Conversations</div>
+        <div class="pt-body">Multi-turn dialogue datasets that teach context retention and conversational coherence.
+        </div>
+        <div class="pt-tags">
+          <span class="pt-tag"
+            style="background:rgba(6,182,212,0.1);color:var(--cyan);border:1px solid rgba(6,182,212,0.2)">OpenAssistant</span>
+          <span class="pt-tag"
+            style="background:rgba(6,182,212,0.1);color:var(--cyan);border:1px solid rgba(6,182,212,0.2)">Curated
+            QA</span>
+        </div>
+      </div>
+      <div class="pt-card">
+        <div class="pt-icon">💻</div>
+        <div class="pt-title">Coding Instructions</div>
+        <div class="pt-body">Code generation, bug fixing, explanation, test writing, and documentation — as instruction
+          tasks, not raw code.</div>
+        <div class="pt-tags">
+          <span class="pt-tag"
+            style="background:rgba(16,185,129,0.1);color:var(--emerald);border:1px solid rgba(16,185,129,0.2)">CodeAlpaca</span>
+          <span class="pt-tag"
+            style="background:rgba(16,185,129,0.1);color:var(--emerald);border:1px solid rgba(16,185,129,0.2)">Evol-Instruct</span>
+        </div>
+      </div>
+      <div class="pt-card">
+        <div class="pt-icon">🔢</div>
+        <div class="pt-title">Mathematical Reasoning</div>
+        <div class="pt-body">Step-by-step problem solving from GSM8K-style to Olympiad-level proofs and derivations.
+        </div>
+        <div class="pt-tags">
+          <span class="pt-tag"
+            style="background:rgba(139,92,246,0.1);color:var(--violet);border:1px solid rgba(139,92,246,0.2)">GSM8K</span>
+          <span class="pt-tag"
+            style="background:rgba(139,92,246,0.1);color:var(--violet);border:1px solid rgba(139,92,246,0.2)">MATH</span>
+        </div>
+      </div>
+      <div class="pt-card">
+        <div class="pt-icon">🔬</div>
+        <div class="pt-title">Scientific QA</div>
+        <div class="pt-body">University-level STEM question answering covering physics, chemistry, biology, and
+          engineering.</div>
+        <div class="pt-tags">
+          <span class="pt-tag"
+            style="background:rgba(245,158,11,0.1);color:var(--amber);border:1px solid rgba(245,158,11,0.2)">ScienceQA</span>
+        </div>
+      </div>
+      <div class="pt-card">
+        <div class="pt-icon">🌐</div>
+        <div class="pt-title">Multilingual Instructions</div>
+        <div class="pt-body">Native multilingual prompts, code-switched conversations, and regional knowledge queries
+          for Indic languages.</div>
+        <div class="pt-tags">
+          <span class="pt-tag"
+            style="background:rgba(244,63,94,0.1);color:var(--rose);border:1px solid rgba(244,63,94,0.2)">Indic
+            datasets</span>
+        </div>
+      </div>
+      <div class="pt-card">
+        <div class="pt-icon">🛠️</div>
+        <div class="pt-title">Tool-Use &amp; Agentic</div>
+        <div class="pt-body">Demonstrations of API calls, browser navigation, file manipulation, and multi-step planning
+          with reasoning traces.</div>
+        <div class="pt-tags">
+          <span class="pt-tag"
+            style="background:rgba(59,130,246,0.1);color:var(--blue);border:1px solid rgba(59,130,246,0.2)">ToolBench</span>
+          <span class="pt-tag"
+            style="background:rgba(59,130,246,0.1);color:var(--blue);border:1px solid rgba(59,130,246,0.2)">APIBench</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!--  SECTION 5 · ALIGNMENT                        -->
+  <!-- ══════════════════════════════════════════════ -->
+  <section id="alignment">
+    <div class="fade-in">
+      <div class="section-label label-rose">05 · RL &amp; Alignment</div>
+      <h2 class="section-title">Making Responses Helpful, Safe &amp; Honest</h2>
+      <p class="section-desc">
+        Supervised fine-tuning teaches <em>how</em> to respond. Alignment training optimizes <em>which</em> responses
+        are actually preferred.
+      </p>
+    </div>
+
+    <div class="card fade-in" style="margin-bottom:32px;">
+      <div class="card-title">⚖️ Preference Optimization Loop</div>
+      <div class="align-flow">
+        <div class="af-row">
+          <div class="af-box"
+            style="text-align:center;background:rgba(59,130,246,0.08);border-color:rgba(59,130,246,0.2)">
+            <h4>User Prompt</h4>
+            <p>A request or question from the user</p>
+          </div>
+        </div>
+        <div class="af-connector"></div>
+        <div class="af-row">
+          <div class="af-box">
+            <h4>Response A</h4>
+            <p>Generated candidate A</p>
+          </div>
+          <div class="af-arrow">vs</div>
+          <div class="af-box">
+            <h4>Response B</h4>
+            <p>Generated candidate B</p>
+          </div>
+        </div>
+        <div class="af-connector"></div>
+        <div class="af-row">
+          <div class="af-box"
+            style="text-align:center;background:rgba(16,185,129,0.08);border-color:rgba(16,185,129,0.2)">
+            <h4 style="color:var(--emerald)">✓ Preferred Response</h4>
+            <p>Human or AI selects the better response. Model learns to generate more like this.</p>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin-top:20px;text-align:center;">
+        Methods: <strong>DPO</strong> · <strong>RLHF</strong> · <strong>RLAIF</strong> — chosen based on preference data
+        availability
+      </p>
+    </div>
+
+    <div class="fade-in">
+      <h3 style="font-size:18px;font-weight:700;margin-bottom:20px;">Alignment Objectives</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+        <div
+          style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:20px">✅</span><span style="font-size:14px;font-weight:600">Helpful responses</span>
+        </div>
+        <div
+          style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:20px">🔍</span><span style="font-size:14px;font-weight:600">Truthfulness</span>
+        </div>
+        <div
+          style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:20px">📌</span><span style="font-size:14px;font-weight:600">Instruction
+            adherence</span>
+        </div>
+        <div
+          style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:20px">🛡️</span><span style="font-size:14px;font-weight:600">Safety</span>
+        </div>
+        <div
+          style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:20px">🚫</span><span style="font-size:14px;font-weight:600">Reduced
+            hallucinations</span>
+        </div>
+        <div
+          style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:20px">🤝</span><span style="font-size:14px;font-weight:600">Consistent reasoning</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!--  SECTION 6 · BENCHMARKS                       -->
+  <!-- ══════════════════════════════════════════════ -->
+  <section id="benchmarks">
+    <div class="fade-in">
+      <div class="section-label label-amber">06 · Benchmarking</div>
+      <h2 class="section-title">How Do We Measure Success?</h2>
+      <p class="section-desc">
+        Every stage of the pipeline has measurable objectives. The table below maps each stage to its evaluation metrics
+        and benchmarks.
+      </p>
+    </div>
+
+    <div class="bench-grid fade-in">
+      <div class="bench-card">
+        <div class="bench-stage" style="color:var(--blue)">Corpus Design</div>
+        <div class="bench-what">Is the corpus balanced?</div>
+        <div class="bench-metrics">
+          <span class="bench-chip">Language distribution</span>
+          <span class="bench-chip">Domain distribution</span>
+          <span class="bench-chip">Document diversity</span>
+        </div>
+      </div>
+      <div class="bench-card">
+        <div class="bench-stage" style="color:var(--cyan)">Data Cleaning</div>
+        <div class="bench-what">Did cleaning improve quality?</div>
+        <div class="bench-metrics">
+          <span class="bench-chip">Duplicate rate removed</span>
+          <span class="bench-chip">PII removal rate</span>
+          <span class="bench-chip">Lang detection accuracy</span>
+        </div>
+      </div>
+      <div class="bench-card">
+        <div class="bench-stage" style="color:var(--violet)">Tokenizer</div>
+        <div class="bench-what">Is it efficient?</div>
+        <div class="bench-metrics">
+          <span class="bench-chip">Fertility</span>
+          <span class="bench-chip">Compression ratio</span>
+          <span class="bench-chip">OOV/UNK rate</span>
+          <span class="bench-chip">Cross-lang fairness</span>
+        </div>
+      </div>
+      <div class="bench-card">
+        <div class="bench-stage" style="color:var(--emerald)">Pre-Training</div>
+        <div class="bench-what">Is the model learning?</div>
+        <div class="bench-metrics">
+          <span class="bench-chip">Training loss</span>
+          <span class="bench-chip">Validation loss</span>
+          <span class="bench-chip">Perplexity</span>
+          <span class="bench-chip">Scaling curves</span>
+        </div>
+      </div>
+      <div class="bench-card">
+        <div class="bench-stage" style="color:var(--amber)">Post-Training</div>
+        <div class="bench-what">Can it follow instructions?</div>
+        <div class="bench-metrics">
+          <span class="bench-chip">IFEval</span>
+          <span class="bench-chip">MT-Bench</span>
+          <span class="bench-chip">AlpacaEval</span>
+        </div>
+      </div>
+      <div class="bench-card">
+        <div class="bench-stage" style="color:var(--rose)">RL / Alignment</div>
+        <div class="bench-what">Are responses preferred &amp; safe?</div>
+        <div class="bench-metrics">
+          <span class="bench-chip">Preference win rate</span>
+          <span class="bench-chip">HarmBench</span>
+          <span class="bench-chip">TruthfulQA</span>
+          <span class="bench-chip">Arena evals</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Capability-specific evals -->
+    <div class="card fade-in" style="margin-top:32px;">
+      <div class="card-title">🎯 Target Capability → Evaluation Benchmark Mapping</div>
+      <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border);">
+        <table>
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th>Benchmark(s)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:600">General Language Understanding</td>
+              <td class="td-code" style="color:var(--blue)">MMLU-Pro, ARC</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600">Coding</td>
+              <td class="td-code" style="color:var(--emerald)">HumanEval, MBPP, LiveCodeBench, SWE-bench</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600">Mathematics</td>
+              <td class="td-code" style="color:var(--violet)">GSM8K, MATH</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600">Science / STEM</td>
+              <td class="td-code" style="color:var(--cyan)">GPQA, MMLU-Pro</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600">Agentic Tasks</td>
+              <td class="td-code" style="color:var(--amber)">WebArena, BFCL</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600">Instruction Following</td>
+              <td class="td-code" style="color:var(--pink)">IFEval, MT-Bench</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600">Multilingual</td>
+              <td class="td-code" style="color:var(--blue)">Belebele, FLORES-200</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600">Long Context</td>
+              <td class="td-code" style="color:var(--violet)">LongBench, RULER</td>
+            </tr>
+            <tr>
+              <td style="font-weight:600">Safety &amp; Alignment</td>
+              <td class="td-code" style="color:var(--rose)">HarmBench, TruthfulQA</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- <footer>
+    <p>Foundation LLM Design Report · Tokenizer + Corpus + Scaling + Alignment</p>
+    <p style="margin-top:6px;color:#374151">Built to communicate the full pipeline from raw data to aligned assistant.
+    </p>
+  </footer> -->
+
+  <script>
+    // ── SCROLL-BASED FADE IN ──────────────────────────
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+    // ── ACTIVE NAV ────────────────────────────────────
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('.nav-links a');
+
+    const navObserver = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          navLinks.forEach(a => a.classList.remove('active'));
+          const link = document.querySelector(`.nav-links a[href="#${e.target.id}"]`);
+          if (link) link.classList.add('active');
+        }
+      });
+    }, { threshold: 0.4 });
+
+    sections.forEach(s => navObserver.observe(s));
+
+    // ── STAGGER POOL CARDS ────────────────────────────
+    document.querySelectorAll('.pool-card, .stage-card, .tok-card, .pt-card, .bench-card').forEach((el, i) => {
+      el.style.transitionDelay = `${(i % 5) * 60}ms`;
+    });
+  </script>
+
+</body>
+
+</html>
