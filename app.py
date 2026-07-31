@@ -61,6 +61,16 @@ async def report(request: Request):
     )
 
 
+@app.get("/report2", response_class=HTMLResponse)
+async def report2(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="report2.html",
+        context={"request": request}
+    )
+
+
+
 @app.post("/tokenize")
 async def tokenize(req: TokenizeRequest):
 
