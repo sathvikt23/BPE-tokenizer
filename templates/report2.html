@@ -5,8 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description"
-    content="Session 3 Data Curation & Pipeline Cleaning Report – Pre-training Dataset Curation, 9-Stage Filtering, and Analytics">
-  <title>Session 3 Data Curation & Pipeline Cleaning Report</title>
+    content="S4">
+  <title>Data Curation & Pipeline Cleaning Report</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Fira+Code:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap"
     rel="stylesheet">
@@ -912,9 +912,25 @@
           <div class="section-num">03</div>
           <div>
             <div class="section-title">Pipeline Implementation &amp; High level Code Blocks</div>
-            <div class="section-subtitle">Inspect the core Python modules driving the 9-stage data cleaning architecture</div>
+            <div class="section-subtitle">Inspect the core Python modules and dependencies driving the 9-stage data cleaning architecture</div>
           </div>
         </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; padding: 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);">
+        <span style="font-size: 12px; font-weight: 700; color: var(--cyan); text-transform: uppercase; letter-spacing: 0.05em; align-self: center; margin-right: 6px;">Pipeline Dependencies:</span>
+        <span class="tag-sm" style="color: var(--text);">bs4</span>
+        <span class="tag-sm" style="color: var(--text);">datasets</span>
+        <span class="tag-sm" style="color: var(--text);">datasketch</span>
+        <span class="tag-sm" style="color: var(--text);">ftfy</span>
+        <span class="tag-sm" style="color: var(--text);">huggingface-hub</span>
+        <span class="tag-sm" style="color: var(--text);">lingua-language-detector</span>
+        <span class="tag-sm" style="color: var(--text);">presidio-analyzer</span>
+        <span class="tag-sm" style="color: var(--text);">presidio-anonymizer</span>
+        <span class="tag-sm" style="color: var(--text);">spacy</span>
+        <span class="tag-sm" style="color: var(--text);">tqdm</span>
+        <span class="tag-sm" style="color: var(--text);">transformers</span>
+        <span class="tag-sm" style="color: var(--text);">zstandard</span>
       </div>
 
       <div class="code-tabs">
@@ -923,11 +939,13 @@
         <button class="code-tab-btn" onclick="showTab('tab-ml')">ml.py (FineWeb-Edu)</button>
         <button class="code-tab-btn" onclick="showTab('tab-domain')">domain_classifier.py (BART)</button>
         <button class="code-tab-btn" onclick="showTab('tab-task')">task_filter.py (Syntax)</button>
+        <button class="code-tab-btn" onclick="showTab('tab-deps')">pyproject.toml (Dependencies)</button>
       </div>
+
 
       <!-- Tab 1: data.py -->
       <div id="tab-data" class="code-panel active">
-        <pre><code><span class="cm"># C:\languages\Tranformers\ASmallOne\data.py</span>
+        <pre><code><span class="cm"></span>
 <span class="kw">from</span> datasets <span class="kw">import</span> load_dataset
 <span class="kw">from</span> cleaning.clean <span class="kw">import</span> cleaner 
 <span class="kw">from</span> tqdm <span class="kw">import</span> tqdm
@@ -986,7 +1004,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=<span class="kw">True</span>)
 
       <!-- Tab 2: clean.py -->
       <div id="tab-clean" class="code-panel">
-        <pre><code><span class="cm"># C:\languages\Tranformers\ASmallOne\cleaning\clean.py</span>
+        <pre><code><span class="cm"></span>
 <span class="kw">from</span> lingua <span class="kw">import</span> Language, LanguageDetectorBuilder
 <span class="kw">from</span> datasketch <span class="kw">import</span> MinHash, MinHashLSH
 <span class="kw">import</span> re, html, ftfy, unicodedata, string
@@ -1034,7 +1052,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=<span class="kw">True</span>)
 
       <!-- Tab 3: ml.py -->
       <div id="tab-ml" class="code-panel">
-        <pre><code><span class="cm"># C:\languages\Tranformers\ASmallOne\cleaning\ml.py</span>
+        <pre><code><span class="cm"></span>
 <span class="kw">from</span> transformers <span class="kw">import</span> pipeline
 
 <span class="kw">class</span> <span class="fn">QualityClassifier</span>:
@@ -1058,7 +1076,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=<span class="kw">True</span>)
 
       <!-- Tab 4: domain_classifier.py -->
       <div id="tab-domain" class="code-panel">
-        <pre><code><span class="cm"># C:\languages\Tranformers\ASmallOne\cleaning\domain_classifier.py</span>
+        <pre><code><span class="cm"></span>
 <span class="kw">from</span> transformers <span class="kw">import</span> pipeline
 
 <span class="kw">class</span> <span class="fn">DomainClassifier</span>:
@@ -1083,7 +1101,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=<span class="kw">True</span>)
 
       <!-- Tab 5: task_filter.py -->
       <div id="tab-task" class="code-panel">
-        <pre><code><span class="cm"># C:\languages\Tranformers\ASmallOne\cleaning\task_filter.py</span>
+        <pre><code><span class="cm"></span>
 <span class="kw">import</span> re
 
 <span class="kw">class</span> <span class="fn">TaskFilter</span>:
@@ -1108,7 +1126,27 @@ os.makedirs(OUTPUT_DIR, exist_ok=<span class="kw">True</span>)
 
         <span class="kw">return True</span></code></pre>
       </div>
+
+      <!-- Tab 6: pyproject.toml (Dependencies) -->
+      <div id="tab-deps" class="code-panel">
+        <pre><code><span class="cm"># Pipeline Core Dependencies</span>
+dependencies = [
+    <span class="str">"bs4"</span>,
+    <span class="str">"datasets"</span>,
+    <span class="str">"datasketch"</span>,
+    <span class="str">"ftfy"</span>,
+    <span class="str">"huggingface-hub"</span>,
+    <span class="str">"lingua-language-detector"</span>,
+    <span class="str">"presidio-analyzer"</span>,
+    <span class="str">"presidio-anonymizer"</span>,
+    <span class="str">"spacy"</span>,
+    <span class="str">"tqdm"</span>,
+    <span class="str">"transformers"</span>,
+    <span class="str">"zstandard"</span>
+]</code></pre>
+      </div>
     </section>
+
 
     <!-- SECTION 4: DATA BEFORE VS AFTER WIDGET -->
     <section class="section-card" id="comparison">
